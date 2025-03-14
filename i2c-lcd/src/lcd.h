@@ -1,6 +1,8 @@
 #ifndef LCD_H
 #define LCD_H
 
+#include <stdint.h>
+
 // go through the init routine for the lcd, this takes about 50ms
 // will set P1.4 - P1.7, P2.0, P2.6, and P2.7 as outputs
 void lcd_init(void);
@@ -29,7 +31,7 @@ void lcd_toggle_cursor(void);
 void lcd_toggle_blink(void);
 
 // toggles the current value for e, which is stored in P2.0
-void clock_e(void);
+void lcd_clock_e(void);
 
 // set the RS and R/W bits accordingly
 void lcd_set_mode(uint8_t rs, uint8_t rw);
@@ -49,6 +51,6 @@ void lcd_cmd_inst(uint8_t byte);
 void lcd_cmd_write(uint8_t byte);
 
 // wait until the busy flag no longer reads as busy
-void poll_busy_flag(void);
+void lcd_poll_busy_flag(void);
 
 #endif
