@@ -3,7 +3,16 @@
 
 #include <stdint.h>
 
+#include "./lcd_defines.h"
+
 /* --- init --- */
+
+
+// what lcd_print_buffer will print to the lcd
+extern char lcd_buffer[LCD_BUFFER_SIZE];
+
+// a bitmap to create custom characters
+extern char lcd_buffer_custom[LCD_BUFFER_CUSTOM_SIZE];
 
 
 // go through the init routine for the lcd, this takes about 50ms

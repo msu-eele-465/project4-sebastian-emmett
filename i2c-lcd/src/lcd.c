@@ -2,13 +2,23 @@
 #include <stdint.h>
 
 #include "./lcd.h"
-
-// this is used to control 3 options on the lcd:
-//  display on/off, cursor, blink
-uint8_t display_ctrl;
+#include "./lcd_defines.h"
 
 
 /* --- init --- */
+
+
+// period= will always be present, so the bufer is initialized to contain it
+char lcd_buffer[LCD_BUFFER_SIZE] = "                period=         ";
+
+// the bitmap is initialized to 0 in all spots, so that if the system is switched
+//  to 5x10, but 5x8 custom characters are still used, garbage will not be present
+//  in the last two spots
+char lcd_buffer_custom[LCD_BUFFER_CUSTOM_SIZE] = {'\x00'};
+
+// used to control 3 options on the lcd:
+//  display on/off, cursor, blink
+uint8_t display_ctrl;
 
 
 void lcd_init(void){
@@ -55,6 +65,24 @@ void lcd_init(void){
 
 
 void lcd_print_buffer(void){
+	lcd_return_home();
+
+	char *lcd_buffer_ptr = lcd_buffer;
+	char *lcd_buffer_end = lcd_buffer + LCD_BUFFER_SIZE / 2;
+
+	while(lcd_buffer_ptr < lcd_buffer_end)
+		lcd_cmd_write((uint8_t) *lcd_buffer_ptr++);
+
+
+	// set DDRAM address to 0x40, this is necessary because the
+	//	display does not automatically jump to it
+	lcd_set_mode(0, 0);
+	lcd_cmd_inst(0xC0);
+
+	lcd_buffer_end = lcd_buffer + LCD_BUFFER_SIZE;
+
+	while(lcd_buffer_ptr < lcd_buffer_end)
+		lcd_cmd_write((uint8_t) *lcd_buffer_ptr++);
 }
 
 void lcd_create_character(uint8_t index){
@@ -135,4 +163,9 @@ void lcd_cmd_inst(uint8_t byte){
 }
 
 void lcd_cmd_write(uint8_t byte){
+	lcd_set_mode(1, 0);	// RS set, R/W cleared
+
+	lcd_cmd_send(byte);
+
+	__delay_cycles(100);
 }
