@@ -27,6 +27,10 @@ void lcd_init(void);
 // lcd_buffer is global so this function takes no parameters
 void lcd_print_buffer(void);
 
+// the last character in the lcd_buffer is reserved for displaying the
+// 	current character (the most recent character pressed)
+void lcd_update_current_char(uint8_t new_char);
+
 // create a custom character at the specified index using lcd_buffer_custom
 // the index may be a value within [0, 7]
 // when printing these value the same index can be used
@@ -55,6 +59,13 @@ void lcd_clock_e(void);
 
 // set the RS and R/W bits accordingly
 void lcd_set_mode(uint8_t rs, uint8_t rw);
+
+// provide an index [0, 7] for 5x8 font, [0, 3] for 5x10 font
+// 	to move to in the CGRAM
+void lcd_set_cgram_addr(uint8_t index);
+
+// provide an address 0x00 - 0x7F to move to in the DDRAM
+void lcd_set_ddram_addr(uint8_t address);
 
 // send the input data to the lcd in 4-bit mode
 // the RS and R/W bits should be appropriately set before calling

@@ -73,16 +73,30 @@ void lcd_print_buffer(void){
 	while(lcd_buffer_ptr < lcd_buffer_end)
 		lcd_cmd_write((uint8_t) *lcd_buffer_ptr++);
 
-
-	// set DDRAM address to 0x40, this is necessary because the
-	//	display does not automatically jump to it
-	lcd_set_mode(0, 0);
-	lcd_cmd_inst(0xC0);
+	// this is necessary because the display does not automatically
+	//	jump to the correct address
+	lcd_set_ddram_addr(0x40);
 
 	lcd_buffer_end = lcd_buffer + LCD_BUFFER_SIZE;
 
 	while(lcd_buffer_ptr < lcd_buffer_end)
 		lcd_cmd_write((uint8_t) *lcd_buffer_ptr++);
+
+	// this questionable command is a result of the project
+	// 	specs. It is necessary to be able to turn the cursor and/or
+	// 	blink on and off, but if they are not visible it cannot
+	// 	be proven, so here the cursor must be set to the last position.
+	lcd_set_ddram_addr(0x4F);
+}
+
+void lcd_update_current_char(uint8_t new_char){
+	lcd_buffer[LCD_BUFFER_SIZE - 1] = new_char;
+
+	lcd_set_ddram_addr(0x4F);
+
+	lcd_cmd_write(new_char);
+
+	lcd_set_ddram_addr(0x4F);
 }
 
 void lcd_create_character(uint8_t index){
@@ -132,6 +146,14 @@ void lcd_set_mode(uint8_t rs, uint8_t rw){
 	else P2OUT &= ~BIT7;
 
 	__delay_cycles(2);
+}
+
+void lcd_set_cgram_addr(uint8_t index){
+}
+
+void lcd_set_ddram_addr(uint8_t address){
+	lcd_set_mode(0, 0);
+	lcd_cmd_inst(0x80 | (address & 0x7F));
 }
 
 void lcd_cmd_send(uint8_t byte){

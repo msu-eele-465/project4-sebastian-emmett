@@ -15,10 +15,14 @@ int main(void)
     lcd_clear_display();
 
     lcd_toggle_cursor();
+    lcd_toggle_blink();
+
     lcd_buffer[0] = 'a';
     lcd_buffer[1] = 'b';
 
     lcd_print_buffer();
+
+    lcd_update_current_char('5');
 
     while (1);
 }
