@@ -7,6 +7,10 @@
 //  display on/off, cursor, blink
 uint8_t display_ctrl;
 
+
+/* --- init --- */
+
+
 void lcd_init(void){
 	// set P1.4 - P1.7, P2.0, P2.6, and P2.7 as outputs
     P1SEL0 &= ~(BIT4 | BIT5 | BIT6 | BIT7);
@@ -46,6 +50,10 @@ void lcd_init(void){
 	lcd_cmd_inst(0x06);	// entry mode set; increment, no shift
 }
 
+
+/* --- general use --- */
+
+
 void lcd_print_buffer(void){
 }
 
@@ -60,18 +68,26 @@ void lcd_clear_display(void){
 	__delay_cycles(3000);	// 2ms = 2000us
 }
 
+void lcd_toggle_cursor(void){
+	display_ctrl ^= BIT1;
+	lcd_cmd_inst(display_ctrl);
+}
+
+void lcd_toggle_blink(void){
+	display_ctrl ^= BIT0;
+	lcd_cmd_inst(display_ctrl);
+}
+
+
+/* --- advanced use --- */
+
+
 void lcd_return_home(void){
 	lcd_set_mode(0, 0);
 
 	lcd_cmd_send(0x02);
 
 	__delay_cycles(3000);	// 2ms = 2000us
-}
-
-void lcd_toggle_cursor(void){
-}
-
-void lcd_toggle_blink(void){
 }
 
 void lcd_clock_e(void){
@@ -110,9 +126,6 @@ void lcd_cmd_send(uint8_t byte){
 	lcd_clock_e();
 }
 
-void lcd_cmd_status(void){
-}
-
 void lcd_cmd_inst(uint8_t byte){
 	lcd_set_mode(0, 0);
 
@@ -122,7 +135,4 @@ void lcd_cmd_inst(uint8_t byte){
 }
 
 void lcd_cmd_write(uint8_t byte){
-}
-
-void poll_busy_flag(void){
 }
