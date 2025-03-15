@@ -2,23 +2,17 @@
 #include <stdint.h>
 
 #include "./lcd.h"
-#include "./lcd_defines.h"
 
 
-/* --- init --- */
+/* --- internal variables --- */
 
-
-// period= will always be present, so the bufer is initialized to contain it
-char lcd_buffer[LCD_BUFFER_SIZE] = "                period=         ";
-
-// the bitmap is initialized to 0 in all spots, so that if the system is switched
-//  to 5x10, but 5x8 custom characters are still used, garbage will not be present
-//  in the last two spots
-char lcd_buffer_custom[LCD_BUFFER_CUSTOM_SIZE] = {'\x00'};
 
 // used to control 3 options on the lcd:
 //  display on/off, cursor, blink
-uint8_t display_ctrl;
+static uint8_t display_ctrl;
+
+
+/* --- init --- */
 
 
 void lcd_init(void){
@@ -64,52 +58,39 @@ void lcd_init(void){
 /* --- general use --- */
 
 
-void lcd_print_buffer(void){
-	lcd_return_home();
+void lcd_print_line(const char *line_chars, uint8_t line_num){
+	if(line_num) lcd_set_ddram_addr(0x40);
+	else lcd_set_ddram_addr(0x00);
 
-	char *lcd_buffer_ptr = lcd_buffer;
-	char *lcd_buffer_end = lcd_buffer + LCD_BUFFER_SIZE / 2;
+	const char *line_chars_end = line_chars + 16;
 
-	while(lcd_buffer_ptr < lcd_buffer_end)
-		lcd_cmd_write((uint8_t) *lcd_buffer_ptr++);
+	while(line_chars < line_chars_end)
+		lcd_cmd_write((uint8_t) *line_chars++);
 
-	// this is necessary because the display does not automatically
-	//	jump to the correct address
-	lcd_set_ddram_addr(0x40);
-
-	lcd_buffer_end = lcd_buffer + LCD_BUFFER_SIZE;
-
-	while(lcd_buffer_ptr < lcd_buffer_end)
-		lcd_cmd_write((uint8_t) *lcd_buffer_ptr++);
-
-	// this questionable command is a result of the project
-	// 	specs. It is necessary to be able to turn the cursor and/or
-	// 	blink on and off, but if they are not visible it cannot
-	// 	be proven, so here the cursor must be set to the last position.
-	lcd_set_ddram_addr(0x4F);
+	// this will set the cursor to the last character of the
+	// 	current line. And for line_num == 1 it will redisplay curr_key
+	if(line_num) lcd_update_current_key();
+	else lcd_set_ddram_addr(0x0F);
 }
 
-void lcd_update_current_char(uint8_t new_char){
-	lcd_buffer[LCD_BUFFER_SIZE - 1] = new_char;
-
+void lcd_update_current_key(void){
 	lcd_set_ddram_addr(0x4F);
 
-	lcd_cmd_write(new_char);
+	lcd_cmd_write((uint8_t) curr_key);
 
 	lcd_set_ddram_addr(0x4F);
 }
 
-void lcd_create_character(uint8_t index){
+void lcd_create_character(const char *bitmap, uint8_t index){
 	lcd_set_cgram_addr(index, 0);
 
 	// write the bitmap into the selected spot
-	char *lcd_buffer_custom_ptr = lcd_buffer_custom;
-	char *lcd_buffer_custom_end = lcd_buffer_custom + LCD_BUFFER_CUSTOM_SIZE;
+	const char *bitmap_end = bitmap + 8;
 
-	while(lcd_buffer_custom_ptr < lcd_buffer_custom_end)
-		lcd_cmd_write((uint8_t) *lcd_buffer_custom_ptr++);
+	while(bitmap < bitmap_end)
+		lcd_cmd_write((uint8_t) *bitmap++);
 
-	// and reset the cursor to the last display position
+	// and set the cursor to the last display position
 	lcd_set_ddram_addr(0x4F);
 }
 
@@ -134,14 +115,6 @@ void lcd_toggle_blink(void){
 
 /* --- advanced use --- */
 
-
-void lcd_return_home(void){
-	lcd_set_mode(0, 0);
-
-	lcd_cmd_send(0x02);
-
-	__delay_cycles(3000);	// 2ms = 2000us
-}
 
 void lcd_clock_e(void){
 	__delay_cycles(2);
