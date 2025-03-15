@@ -100,6 +100,17 @@ void lcd_update_current_char(uint8_t new_char){
 }
 
 void lcd_create_character(uint8_t index){
+	lcd_set_cgram_addr(index, 0);
+
+	// write the bitmap into the selected spot
+	char *lcd_buffer_custom_ptr = lcd_buffer_custom;
+	char *lcd_buffer_custom_end = lcd_buffer_custom + LCD_BUFFER_CUSTOM_SIZE;
+
+	while(lcd_buffer_custom_ptr < lcd_buffer_custom_end)
+		lcd_cmd_write((uint8_t) *lcd_buffer_custom_ptr++);
+
+	// and reset the cursor to the last display position
+	lcd_set_ddram_addr(0x4F);
 }
 
 void lcd_clear_display(void){
@@ -148,7 +159,13 @@ void lcd_set_mode(uint8_t rs, uint8_t rw){
 	__delay_cycles(2);
 }
 
-void lcd_set_cgram_addr(uint8_t index){
+void lcd_set_cgram_addr(uint8_t index, uint8_t sub_index){
+	lcd_set_mode(0, 0);
+
+	// the index is shifted left three so it will select the
+	//	appropriate character, and the sub_index will select
+	//	the position within that character
+	lcd_cmd_inst(0x40 | (index << 3 & 0x38) | (sub_index & 0x07));
 }
 
 void lcd_set_ddram_addr(uint8_t address){

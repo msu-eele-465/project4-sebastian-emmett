@@ -62,7 +62,7 @@ void lcd_set_mode(uint8_t rs, uint8_t rw);
 
 // provide an index [0, 7] for 5x8 font, [0, 3] for 5x10 font
 // 	to move to in the CGRAM
-void lcd_set_cgram_addr(uint8_t index);
+void lcd_set_cgram_addr(uint8_t index, uint8_t sub_index);
 
 // provide an address 0x00 - 0x7F to move to in the DDRAM
 void lcd_set_ddram_addr(uint8_t address);
