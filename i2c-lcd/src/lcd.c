@@ -67,9 +67,8 @@ void lcd_print_line(const char *line_chars, uint8_t line_num){
 	while(line_chars < line_chars_end)
 		lcd_cmd_write((uint8_t) *line_chars++);
 
-	// this will set the cursor to the last character of the
-	// 	current line. And for line_num == 1 it will redisplay curr_key
-	if(line_num) lcd_update_current_key();
+	// this will set the cursor to the last character of the current line
+	if(line_num) lcd_set_ddram_addr(0x4F);
 	else lcd_set_ddram_addr(0x0F);
 }
 

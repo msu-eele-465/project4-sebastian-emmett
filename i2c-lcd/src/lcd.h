@@ -24,8 +24,7 @@ void lcd_init(void);
 
 
 // choose a line and print the given characters to it
-// the cursor will appear at the end of the given line, and if
-// 	line_num == 1 lcd_update_current_char will be called afterwards
+// the cursor will appear at the end of the given line
 void lcd_print_line(const char *line_chars, uint8_t line_num);
 
 // display curr_key at the end of line 1
