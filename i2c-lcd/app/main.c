@@ -12,6 +12,13 @@
 extern bool new_key;
 
 
+/* These should be declared elsewhere in the final version
+	They are only here now so that main.c compiles
+*/
+bool new_key = false;
+char curr_key = 'a';
+/* ^^^ Make sure to declare these elsewhere ^^^ */
+
 /* --- program --- */
 
 
@@ -58,8 +65,6 @@ int main(void)
     // Stop watchdog timer
     WDTCTL = WDTPW | WDTHOLD;
 
-	lcd_init();
-
 	const char *pattern_0 = "static          ";
 	const char *pattern_1 = "toggle          ";
 	const char *pattern_2 = "up counter      ";
@@ -83,101 +88,108 @@ int main(void)
     // Disable low-power mode / GPIO high-impedance
     PM5CTL0 &= ~LOCKLPM5;
 
-    while (1)
-    {
+	// This double while(1) loop looks redudant but is quite important. Without this
+	// 	extra while(1) loop, when powering up a programmed MSP the lcd_init will
+	// 	always fail. I do not know why this solves it, but it does.
+	// This implies that the extra while(1) loop is unecessary when debugging with
+	// 	CCS, but it can be handy for resetting the lcd mid-debug.
+	while(1){
+		lcd_init();
+
 		// TODO: i2c_init_as_slave
 
-		if(new_key){
-			switch(curr_key){
-				case 'D':
-					locked = 1;
-					lcd_clear_display();
-					lcd_set_ddram_addr(0x20);	// this is so the cursor does not show up
+		while (1)
+		{
+			if(new_key){
+				switch(curr_key){
+					case 'D':
+						locked = 1;
+						lcd_clear_display();
+						lcd_set_ddram_addr(0x20);	// this is so the cursor does not show up
 
-					break;
+						break;
 
-				case 'U':
-					locked = 0;
+					case 'U':
+						locked = 0;
 
-					break;
+						break;
 
-				case 'A':
-					base_transition_period++;
-					_update_transition_period(transition_period, base_transition_period);
+					case 'A':
+						base_transition_period++;
+						_update_transition_period(transition_period, base_transition_period);
 
-					lcd_print_line(transition_period, 1);
+						lcd_print_line(transition_period, 1);
 
-					break;
+						break;
 
-				case 'B':
-					base_transition_period--;
-					_update_transition_period(transition_period, base_transition_period);
+					case 'B':
+						base_transition_period--;
+						_update_transition_period(transition_period, base_transition_period);
 
-					lcd_print_line(transition_period, 1);
+						lcd_print_line(transition_period, 1);
 
-					break;
+						break;
 
-				case 'C':
-					lcd_toggle_cursor();
+					case 'C':
+						lcd_toggle_cursor();
 
-					break;
+						break;
 
-				case '0':
-					lcd_print_line(pattern_0, 0);
+					case '0':
+						lcd_print_line(pattern_0, 0);
 
-					break;
+						break;
 
-				case '1':
-					lcd_print_line(pattern_1, 0);
+					case '1':
+						lcd_print_line(pattern_1, 0);
 
-					break;
+						break;
 
-				case '2':
-					lcd_print_line(pattern_2, 0);
+					case '2':
+						lcd_print_line(pattern_2, 0);
 
-					break;
+						break;
 
-				case '3':
-					lcd_print_line(pattern_3, 0);
+					case '3':
+						lcd_print_line(pattern_3, 0);
 
-					break;
+						break;
 
-				case '4':
-					lcd_print_line(pattern_4, 0);
+					case '4':
+						lcd_print_line(pattern_4, 0);
 
-					break;
+						break;
 
-				case '5':
-					lcd_print_line(pattern_5, 0);
+					case '5':
+						lcd_print_line(pattern_5, 0);
 
-					break;
+						break;
 
-				case '6':
-					lcd_print_line(pattern_6, 0);
+					case '6':
+						lcd_print_line(pattern_6, 0);
 
-					break;
+						break;
 
-				case '7':
-					lcd_print_line(pattern_7, 0);
+					case '7':
+						lcd_print_line(pattern_7, 0);
 
-					break;
+						break;
 
-				case '9':
-					lcd_toggle_blink();
+					case '9':
+						lcd_toggle_blink();
 
-					break;
+						break;
 
-				default:
-					break;
+					default:
+						break;
+				}
+
+				lcd_update_current_key();
+				new_key = false;
 			}
-
-			lcd_update_current_key();
-			new_key = false;
+			else{
+				if(locked) lcd_clear_display();
+			}
 		}
-		else{
-			if(locked) lcd_clear_display();
-		}
-    }
-
-	return 0;
+	}
 }
