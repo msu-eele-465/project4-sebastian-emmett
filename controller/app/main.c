@@ -3,7 +3,6 @@
 #include <string.h>
 #include "../src/keyboard.h"    // Include this to use init_keypad() and poll_keypad()
 #include "../src/heartbeat.h"   // For init_heartbeat()
-#include "../src/led_bar.h"     // For led_bar_update_pattern() and led_bar_delay
 #include "../src/rgb_led.h"     // For adjusting the pwm signal meant for rgb_led
 #include "../src/pwm.h"         // For creating the pwm signal on P6.0 - P6.2
 #include "../src/i2c.h"         // Include I2C header
@@ -45,6 +44,41 @@ unsigned pass_index = 0;            // How many digits we've collected so far
 // Timeout tracking: We'll use the heartbeat (1Hz) to decrement
 volatile int pass_timer = 0;        // 5-second countdown if unlocking
 
+// Function to set RGB LED color based on the current pattern (migrated from led_bar.c)
+void set_rgb_for_pattern(char pattern)
+{
+    switch (pattern)
+    {
+        case '0':
+            rgb_set(0xFF, 0xFF, 0xFF); // white
+            break;
+        case '1':
+            rgb_set(0x94, 0x00, 0x00); // blood
+            break;
+        case '2':
+            rgb_set(0x00, 0xFF, 0x00); // lime
+            break;
+        case '3':
+            rgb_set(0xFF, 0x80, 0x00); // orange
+            break;
+        case '4':
+            rgb_set(0x00, 0x00, 0xFF); // blue
+            break;
+        case '5':
+            rgb_set(0x15, 0x15, 0x2e); // navy
+            break;
+        case '6':
+            rgb_set(0xFF, 0x00, 0xE1); // lavender
+            break;
+        case '7':
+            rgb_set(0x20, 0x46, 0x22); // forest
+            break;
+        default:
+            // No change or could set a default color (e.g., off: 0x00, 0x00, 0x00)
+            break;
+    }
+}
+
 // ----------------------------------------------------------------------------
 // MAIN
 // ----------------------------------------------------------------------------
@@ -75,7 +109,6 @@ int main(void)
         if (locked && !unlocking)
         {
             rgb_set(0xC4, 0x3E, 0x1D);  // set state led as red color, for locked state
-            led_bar_update(0x00);   // clear the bar display
 
             // If no numeric key has been pressed yet, do nothing
             if (!num_update)
@@ -153,9 +186,9 @@ int main(void)
         // ----------------------------------------------------------------------------
         else
         {
-            // locked == false => update led_bar
-            led_bar_update_pattern();
-            led_bar_delay();
+            // locked == false
+            // Update RGB LED based on curr_num when unlocked
+            set_rgb_for_pattern(curr_num);
         }
     }
 }
