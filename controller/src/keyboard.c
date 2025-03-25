@@ -2,6 +2,7 @@
 #include <stdbool.h>
 #include "keyboard.h"
 #include "../src/rgb_led.h"
+#include "../src/i2c.h"     // For i2c_send_to_both()
 
 // 4x4 Keypad Layout
 static const char KEYPAD_MAP[4][4] =
@@ -122,6 +123,12 @@ __interrupt void TIMER1_B0_ISR(void)
         // Shift curr_key -> prev_key, store the new key
         prev_key = curr_key;
         curr_key = key;
+
+        // Send the key if not locked
+        if (!locked)
+        {
+            i2c_send_to_both(key);
+        }
 
         // ---------------------------
         // Additional Logic

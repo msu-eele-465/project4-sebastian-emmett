@@ -6,6 +6,8 @@
 #include "../src/led_bar.h"     // For led_bar_update_pattern() and led_bar_delay
 #include "../src/rgb_led.h"     // For adjusting the pwm signal meant for rgb_led
 #include "../src/pwm.h"         // For creating the pwm signal on P6.0 - P6.2
+#include "../src/i2c.h"         // Include I2C header
+
 
 // ----------------------------------------------------------------------------
 // Globals! (yes they deserve their own lil space)
@@ -56,6 +58,7 @@ int main(void)
     init_keyscan_timer();       // Timer_B1 => ~50 ms interrupt
     led_bar_init();             // configure P3.0 - P3.7 as outputs for led bar
     pwm_init();                 // start pwm signal on P6.0 - P6.2
+    i2c_master_init();          // Initialize I2C module as master
 
     PM5CTL0 &= ~LOCKLPM5;       // Unlock I/Os
 
@@ -137,6 +140,7 @@ int main(void)
                         locked = false;
                         curr_num = 0; // Setting this to nothing so it doesn't immedately jump into a pattern
                         rgb_set(0x1D, 0xA2, 0xC4);  // set state LED to blueish color, for unlocked
+                        i2c_send_to_both('U');      // Send 'U' to both slaves
                     }
                     // Otherwise => stay locked, reset
                     unlocking = false;
