@@ -2,22 +2,14 @@
 #include <stdbool.h>
 
 #include "../src/lcd.h"
+#include "../src/i2c.h"
 
 
 /* --- global variables --- */
 
+#define SLAVE_ADDRESS SLAVE2_ADDR  // Use SLAVE2_ADDR from i2c.h
 
-// used to indentify if a new key has been pressed, and thus
-// 	that the appropriate logic should take place
-extern bool new_key;
-
-
-/* These should be declared elsewhere in the final version
-	They are only here now so that main.c compiles
-*/
-bool new_key = false;
 char curr_key = 'a';
-/* ^^^ Make sure to declare these elsewhere ^^^ */
 
 /* --- program --- */
 
@@ -96,11 +88,14 @@ int main(void)
 	while(1){
 		lcd_init();
 
-		// TODO: i2c_init_as_slave
+		// Initialize I2C as slave
+    	i2c_slave_init(SLAVE_ADDRESS);
 
 		while (1)
 		{
-			if(new_key){
+			if (UCB0IFG & UCRXIFG)  // Poll the receive interrupt flag
+        	{
+            	curr_key = UCB0RXBUF;  // Read the received data
 				switch(curr_key){
 					case 'D':
 						locked = 1;
@@ -185,7 +180,6 @@ int main(void)
 				}
 
 				lcd_update_current_key();
-				new_key = false;
 			}
 			else{
 				if(locked) lcd_clear_display();
