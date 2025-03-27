@@ -33,7 +33,8 @@ int main(void)
 	int i;
 	int j;
 	
-	while(1){
+	while (1)
+	{
 		lcd_init();
 
 		lcd_clear_display();
@@ -50,11 +51,15 @@ int main(void)
 		lcd_create_character(bitmap_6, 6);
 		lcd_create_character(bitmap_7, 7);
 
-		while(1){
-			for(i = 0 ; i < 16; i++){
+		while (1)
+		{
+			for (i = 0 ; i < 16; i++)
+			{
 				lcd_print_line(lcd_buffer, 0);
-				for(j = 0; j < 16; j++)
+				for (j = 0; j < 16; j++)
+				{
 					lcd_buffer[j] += 16;
+				}
 
 				lcd_position[9] = '0' + i / 10;
 				lcd_position[10] = '0' + i % 10;

@@ -3,8 +3,6 @@
 
 #include <stdint.h>
 
-#include "src/lcd.h"
-
 /* --- external variables --- */
 
 
@@ -41,7 +39,6 @@ void lcd_update_current_key(void);
 void lcd_create_character(const char *bitmap, uint8_t index);
 
 // clear the lcd's display
-// will also set the cursor out of display bounds so it does not show up
 void lcd_clear_display(void);
 
 // toggle the lcd's cursor between on or off
