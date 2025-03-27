@@ -6,7 +6,7 @@
 #include "../src/led_bar.h"     // For led_bar_update_pattern() and led_bar_delay
 #include "../src/rgb_led.h"     // For adjusting the pwm signal meant for rgb_led
 #include "../src/pwm.h"         // For creating the pwm signal on P6.0 - P6.2
-#include "../src/i2c.h"         // Include I2C header
+#include "../../common/i2c.h"   // Include I2C header
 
 // Testing main.c file for sending i2c values from keypad
 

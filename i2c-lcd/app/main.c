@@ -2,12 +2,12 @@
 #include <stdbool.h>
 
 #include "../src/lcd.h"
-#include "../src/i2c.h"
+#include "../../common/i2c.h"
 
 
 /* --- global variables --- */
 
-#define SLAVE_ADDRESS SLAVE2_ADDR  // Use SLAVE2_ADDR from i2c.h
+#define SLAVE_ADDRESS SLAVE1_ADDR  // Use SLAVE2_ADDR from i2c.h --TESTING SOMETHING HERE S1
 
 char curr_key = 'a';
 
@@ -90,12 +90,12 @@ int main(void)
 
 		// Initialize I2C as slave
     	i2c_slave_init(SLAVE_ADDRESS);
+		__enable_interrupt();
 
 		while (1)
 		{
-			if (UCB0IFG & UCRXIFG)  // Poll the receive interrupt flag
+			if (i2c_get_received_data(&curr_key))  // Poll to see if we have a new key - store in curr_key if so
         	{
-            	curr_key = UCB0RXBUF;  // Read the received data
 				switch(curr_key){
 					case 'D':
 						locked = 1;

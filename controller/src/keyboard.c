@@ -2,7 +2,7 @@
 #include <stdbool.h>
 #include "keyboard.h"
 #include "../src/rgb_led.h"
-#include "../src/i2c.h"     // For i2c_send_to_both()
+#include "../../common/i2c.h"     // For i2c_send_to_both()
 
 // 4x4 Keypad Layout
 static const char KEYPAD_MAP[4][4] =
@@ -107,6 +107,7 @@ __interrupt void TIMER1_B0_ISR(void)
     extern char curr_key;
     extern char prev_key;
     extern bool locked;
+    extern bool unlocking;
     extern int base_transition_period;
     extern char curr_num;
     extern char prev_num;
@@ -138,6 +139,8 @@ __interrupt void TIMER1_B0_ISR(void)
         if (key == 'D')
         {
             locked = true;
+            unlocking = false;
+            num_update = false;
         }
         // 2) If 'A' => base_transition_period -= 4, min=4
         else if (key == 'A' && !locked)

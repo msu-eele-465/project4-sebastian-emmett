@@ -4,7 +4,7 @@
 
 // We'll reference these globals from main.c
 extern int base_transition_period;
-extern float BTP_multiplier;
+extern int BTP_multiplier;
 extern char new_key;
 extern char curr_num;
 extern bool locked;
@@ -40,7 +40,7 @@ void led_bar_init(void)
 // ----------------------------------------------------------------------------
 // led_bar_update_pattern:
 //   Single switch case over curr_num, cases for 0-7
-//   Set BTP_multiplier = 2 in the respective value
+//   Set BTP_multiplier = 4 in the respective value
 //   React to reset_pattern
 //   Then update the pattern accordingly
 // ----------------------------------------------------------------------------
@@ -49,14 +49,14 @@ void led_bar_update_pattern(void)
     switch (curr_num)
     {
         case '0':
-            BTP_multiplier = 1;
+            BTP_multiplier = 4;
 
             led_bar_update(0xAA);   // display 10101010
             reset_pattern = false;
             break;
 
         case '1':
-            BTP_multiplier = 1;
+            BTP_multiplier = 4;
             if (reset_pattern)
             {
                 count_1 = 0xAA;                
@@ -71,7 +71,7 @@ void led_bar_update_pattern(void)
             break;
 
         case '2':
-            BTP_multiplier = 0.5;
+            BTP_multiplier = 2;
             if (reset_pattern)
             {
                 count_2 = 0;
@@ -87,7 +87,7 @@ void led_bar_update_pattern(void)
             break;
 
         case '3':
-            BTP_multiplier = 0.5;
+            BTP_multiplier = 2;
             if (reset_pattern)
             {
                 count_3 = 0;
@@ -102,7 +102,7 @@ void led_bar_update_pattern(void)
             break;
 
         case '4':
-            BTP_multiplier = 0.25;
+            BTP_multiplier = 1;
             if (reset_pattern)
             {
                 count_4 = 0;
@@ -132,7 +132,7 @@ void led_bar_update_pattern(void)
 void led_bar_delay(void)
 {
     // local variable to keep track of how long the delay is
-    int loop_count = base_transition_period * BTP_multiplier;
+    int loop_count = base_transition_period * BTP_multiplier / 4;
 
     // while loop_count > 0
     while (loop_count > 0)

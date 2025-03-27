@@ -5,7 +5,8 @@
 #include "../src/heartbeat.h"   // For init_heartbeat()
 #include "../src/rgb_led.h"     // For adjusting the pwm signal meant for rgb_led
 #include "../src/pwm.h"         // For creating the pwm signal on P6.0 - P6.2
-#include "../src/i2c.h"         // Include I2C header
+#include "../../common/i2c.h"   // Include I2C header
+#include "msp430fr2355.h"
 
 
 // ----------------------------------------------------------------------------
@@ -90,11 +91,11 @@ int main(void)
     init_keypad();              // Init keyboard with P4s as input and P5s as output
     init_responseLED();         // LED on P6.6 to show when a key gets pressed
     init_keyscan_timer();       // Timer_B1 => ~50 ms interrupt
-    led_bar_init();             // configure P3.0 - P3.7 as outputs for led bar
     pwm_init();                 // start pwm signal on P6.0 - P6.2
     i2c_master_init();          // Initialize I2C module as master
 
-    PM5CTL0 &= ~LOCKLPM5;       // Unlock I/Os
+    PM5CTL0 &= ~LOCKLPM5;       // Turn on I/O
+
 
     // Enable global interrupts for the heartbeat timer
     __bis_SR_register(GIE);
@@ -145,6 +146,7 @@ int main(void)
             {
                 // Time’s up => reset D:
                 unlocking = false;
+                pass_index = 0;
 
                 rgb_set(0xC4, 0x3E, 0x1D);  // set state led as red color, for locked state
             }
