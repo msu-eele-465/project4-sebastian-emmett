@@ -114,22 +114,24 @@ int main(void)
 
 					case 'U':
 						locked = 0;
+
+						_update_transition_period(transition_period, base_transition_period);
 						lcd_print_line(transition_period, 1);
 
 						break;
 
 					case 'A':
 						base_transition_period++;
-						_update_transition_period(transition_period, base_transition_period);
 
+						_update_transition_period(transition_period, base_transition_period);
 						lcd_print_line(transition_period, 1);
 
 						break;
 
 					case 'B':
 						base_transition_period--;
-						_update_transition_period(transition_period, base_transition_period);
 
+						_update_transition_period(transition_period, base_transition_period);
 						lcd_print_line(transition_period, 1);
 
 						break;
