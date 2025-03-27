@@ -1,84 +1,204 @@
-/* --COPYRIGHT--,BSD_EX
- * Copyright (c) 2014, Texas Instruments Incorporated
- * All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- *
- * *  Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- *
- * *  Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- *
- * *  Neither the name of Texas Instruments Incorporated nor the names of
- *    its contributors may be used to endorse or promote products derived
- *    from this software without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
- * THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR
- * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
- * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
- * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
- * OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
- * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
- * OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
- * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- *******************************************************************************
- *
- *                       MSP430 CODE EXAMPLE DISCLAIMER
- *
- * MSP430 code examples are self-contained low-level programs that typically
- * demonstrate a single peripheral function or device feature in a highly
- * concise manner. For this the code may rely on the device's power-on default
- * register values and settings such as the clock configuration and care must
- * be taken when combining code from several examples to avoid potential side
- * effects. Also see www.ti.com/grace for a GUI- and www.ti.com/msp430ware
- * for an API functional library-approach to peripheral configuration.
- *
- * --/COPYRIGHT--*/
-//******************************************************************************
-//  MSP430FR231x Demo - Toggle P1.0 using software
-//
-//  Description: Toggle P1.0 every 0.1s using software.
-//  By default, FR231x select XT1 as FLL reference.
-//  If XT1 is present, the PxSEL(XIN & XOUT) needs to configure.
-//  If XT1 is absent, switch to select REFO as FLL reference automatically.
-//  XT1 is considered to be absent in this example.
-//  ACLK = default REFO ~32768Hz, MCLK = SMCLK = default DCODIV ~1MHz.
-//
-//           MSP430FR231x
-//         ---------------
-//     /|\|               |
-//      | |               |
-//      --|RST            |
-//        |           P1.0|-->LED
-//
-//   Darren Lu
-//   Texas Instruments Inc.
-//   July 2015
-//   Built with IAR Embedded Workbench v6.30 & Code Composer Studio v6.1 
-//******************************************************************************
-#include <msp430.h>
+#include <msp430fr2310.h>
+#include <stdbool.h>
+
+#include "../src/lcd.h"
+#include "../../common/i2c.h"
+
+
+/* --- global variables --- */
+
+#define SLAVE_ADDRESS SLAVE1_ADDR
+
+char curr_key = 'a';
+
+/* --- program --- */
+
+
+// this contains the logic to update the transition_period
+// 	string according to the base_transition_period
+void _update_transition_period(char *transition_period, uint8_t base_transition_period)
+{
+
+	// soft cap of base_transition_period at 9.75, since it
+	// 	seems unreasonable to display anything more than that
+	if (base_transition_period > 39)
+	{
+		base_transition_period = 39;
+	}
+
+	// first turn the integer part into a string
+	transition_period[7] = '0' + (base_transition_period >> 2);
+
+	// because the base_transition_period moves in increments of
+	//  0.25 it is possible to switch on the lower 4 bits of it
+	//  and insert the correct string with no further calculation
+	switch (base_transition_period & 0x03)
+	{
+		case 0x00:
+			transition_period[9] = '0';
+			transition_period[10] = '0';
+			break;
+
+		case 0x01:
+			transition_period[9] = '2';
+			transition_period[10] = '5';
+			break;
+
+		case 0x02:
+			transition_period[9] = '5';
+			transition_period[10] = '0';
+			break;
+
+		case 0x03:
+			transition_period[9] = '7';
+			transition_period[10] = '5';
+			break;
+	}
+}
 
 int main(void)
 {
-    WDTCTL = WDTPW | WDTHOLD;               // Stop watchdog timer
+    // Stop watchdog timer
+	WDTCTL = WDTPW | WDTHOLD;
 
-    P1OUT &= ~BIT0;                         // Clear P1.0 output latch for a defined power-on state
-    P1DIR |= BIT0;                          // Set P1.0 to output direction
+	const char *pattern_0 = "static          ";
+	const char *pattern_1 = "toggle          ";
+	const char *pattern_2 = "up counter      ";
+	const char *pattern_3 = "in and out      ";
+	const char *pattern_4 = "down counter    ";
+	const char *pattern_5 = "rotate 1 left   ";
+	const char *pattern_6 = "rotate 7 left   ";
+	const char *pattern_7 = "fill left       ";
 
-    PM5CTL0 &= ~LOCKLPM5;                   // Disable the GPIO power-on default high-impedance mode
-                                            // to activate previously configured port settings
+	char transition_period[] = "period=0.00     ";
 
-    while(1)
-    {
-        P1OUT ^= BIT0;                      // Toggle P1.0 using exclusive-OR
-        __delay_cycles(100000);             // Delay for 100000*(1/MCLK)=0.1s
-    }
+	// each integer value will represent a change of 0.25 in the
+	//  actual transition_period, due to this the current value
+	//  is interpreted as 1
+	// this interpretation makes string conversion much faster
+	uint8_t base_transition_period = 4;	
+
+	uint8_t locked = 1;
+
+    // Disable low-power mode / GPIO high-impedance
+	PM5CTL0 &= ~LOCKLPM5;
+
+	// This double while(1) loop looks redudant but is quite important. Without this
+	// 	extra while(1) loop, when powering up a programmed MSP the lcd_init will
+	// 	always fail. I do not know why this solves it, but it does.
+	// Unfortunately, this extra while(1) loop can cause issues when debugging with CCS.
+	while (1)
+	{
+		lcd_init();
+
+		// Initialize I2C as slave
+    	i2c_slave_init(SLAVE_ADDRESS);
+		__enable_interrupt();
+
+		while (1)
+		{
+			// Poll to see if we have a new key - store in curr_key if so
+			if (i2c_get_received_data(&curr_key))
+        	{
+				switch (curr_key)
+				{
+					case 'D':
+						locked = 1;
+						lcd_clear_display();
+
+						// this is so the cursor does not show up on a
+						//	cleared scrren, that would defeat the purpose
+						lcd_set_ddram_addr(0x20);
+
+						break;
+
+					case 'U':
+						locked = 0;
+
+						_update_transition_period(transition_period, base_transition_period);
+						lcd_print_line(transition_period, 1);
+
+						break;
+
+					case 'A':
+						base_transition_period++;
+
+						_update_transition_period(transition_period, base_transition_period);
+						lcd_print_line(transition_period, 1);
+
+						break;
+
+					case 'B':
+						base_transition_period--;
+
+						_update_transition_period(transition_period, base_transition_period);
+						lcd_print_line(transition_period, 1);
+
+						break;
+
+					case 'C':
+						lcd_toggle_cursor();
+
+						break;
+
+					case '0':
+						lcd_print_line(pattern_0, 0);
+
+						break;
+
+					case '1':
+						lcd_print_line(pattern_1, 0);
+
+						break;
+
+					case '2':
+						lcd_print_line(pattern_2, 0);
+
+						break;
+
+					case '3':
+						lcd_print_line(pattern_3, 0);
+
+						break;
+
+					case '4':
+						lcd_print_line(pattern_4, 0);
+
+						break;
+
+					case '5':
+						lcd_print_line(pattern_5, 0);
+
+						break;
+
+					case '6':
+						lcd_print_line(pattern_6, 0);
+
+						break;
+
+					case '7':
+						lcd_print_line(pattern_7, 0);
+
+						break;
+
+					case '9':
+						lcd_toggle_blink();
+
+						break;
+
+					default:
+						break;
+				}
+
+				lcd_update_current_key();
+			}
+			else
+			{
+				if (locked)
+				{
+					lcd_clear_display();
+				}
+			}
+		}
+	}
 }

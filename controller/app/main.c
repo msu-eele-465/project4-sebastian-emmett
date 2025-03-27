@@ -1,84 +1,196 @@
-/* --COPYRIGHT--,BSD_EX
- * Copyright (c) 2016, Texas Instruments Incorporated
- * All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- *
- * *  Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- *
- * *  Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- *
- * *  Neither the name of Texas Instruments Incorporated nor the names of
- *    its contributors may be used to endorse or promote products derived
- *    from this software without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
- * THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR
- * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
- * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
- * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
- * OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
- * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
- * OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
- * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- *******************************************************************************
- *
- *                       MSP430 CODE EXAMPLE DISCLAIMER
- *
- * MSP430 code examples are self-contained low-level programs that typically
- * demonstrate a single peripheral function or device feature in a highly
- * concise manner. For this the code may rely on the device's power-on default
- * register values and settings such as the clock configuration and care must
- * be taken when combining code from several examples to avoid potential side
- * effects. Also see www.ti.com/grace for a GUI- and www.ti.com/msp430ware
- * for an API functional library-approach to peripheral configuration.
- *
- * --/COPYRIGHT--*/
-//******************************************************************************
-//  MSP430FR235x Demo - Toggle P1.0 using software
-//
-//  Description: Toggle P1.0 every 0.1s using software.
-//  By default, FR235x select XT1 as FLL reference.
-//  If XT1 is present, the PxSEL(XIN & XOUT) needs to configure.
-//  If XT1 is absent, switch to select REFO as FLL reference automatically.
-//  XT1 is considered to be absent in this example.
-//  ACLK = default REFO ~32768Hz, MCLK = SMCLK = default DCODIV ~1MHz.
-//
-//           MSP430FR2355
-//         ---------------
-//     /|\|               |
-//      | |               |
-//      --|RST            |
-//        |           P1.0|-->LED
-//
-//   Cash Hao
-//   Texas Instruments Inc.
-//   November 2016
-//   Built with IAR Embedded Workbench v6.50.0 & Code Composer Studio v6.2.0
-//******************************************************************************
 #include <msp430.h>
+#include <stdbool.h>
+#include <string.h>
+#include "../src/keyboard.h"    // Include this to use init_keypad() and poll_keypad()
+#include "../src/heartbeat.h"   // For init_heartbeat()
+#include "../src/rgb_led.h"     // For adjusting the pwm signal meant for rgb_led
+#include "../src/pwm.h"         // For creating the pwm signal on P6.0 - P6.2
+#include "../../common/i2c.h"   // Include I2C header
+#include "msp430fr2355.h"
 
+
+// ----------------------------------------------------------------------------
+// Globals! (yes they deserve their own lil space)
+// ----------------------------------------------------------------------------
+// For general key tracking
+bool key_down = false;
+char curr_key = 0;
+char prev_key = 0;
+
+// For numeric-only tracking
+char curr_num = 0;
+char prev_num = 0;
+
+// A boolean for locked/unlocked system state
+bool locked = true; // Default true
+
+// Our base transition period variable. Technically this is an int representation of how many 1/16s our actual BTP is
+int base_transition_period = 16;
+
+// If a numeric key is pressed, set num_update = true
+bool num_update = false;
+
+// If the new numeric key == previous numeric key, set reset_pattern = true
+bool reset_pattern = false;
+
+// The global int BTP_multiplier:
+float BTP_multiplier = 1;
+
+// Variables for our passcode
+bool unlocking = false;             // True while we're collecting 4 digits
+static const char CORRECT_PASS[] = "1234";  // Hard-coded correct passcode
+char pass_entered[5];               // Room for 4 digits + null terminator
+unsigned pass_index = 0;            // How many digits we've collected so far
+
+// Timeout tracking: We'll use the heartbeat (1Hz) to decrement
+volatile int pass_timer = 0;        // 5-second countdown if unlocking
+
+// Function to set RGB LED color based on the current pattern (migrated from led_bar.c)
+void set_rgb_for_pattern(char pattern)
+{
+    switch (pattern)
+    {
+        case '0':
+            rgb_set(0xFF, 0xFF, 0xFF); // white
+            break;
+        case '1':
+            rgb_set(0x94, 0x00, 0x00); // blood
+            break;
+        case '2':
+            rgb_set(0x00, 0xFF, 0x00); // lime
+            break;
+        case '3':
+            rgb_set(0xFF, 0x80, 0x00); // orange
+            break;
+        case '4':
+            rgb_set(0x00, 0x00, 0xFF); // blue
+            break;
+        case '5':
+            rgb_set(0x15, 0x15, 0x2e); // navy
+            break;
+        case '6':
+            rgb_set(0xFF, 0x00, 0xE1); // lavender
+            break;
+        case '7':
+            rgb_set(0x20, 0x46, 0x22); // forest
+            break;
+        default:
+            // No change or could set a default color (e.g., off: 0x00, 0x00, 0x00)
+            break;
+    }
+}
+
+// ----------------------------------------------------------------------------
+// MAIN
+// ----------------------------------------------------------------------------
 int main(void)
 {
-    WDTCTL = WDTPW | WDTHOLD;               // Stop watchdog timer
-    
-    P1OUT &= ~BIT0;                         // Clear P1.0 output latch for a defined power-on state
-    P1DIR |= BIT0;                          // Set P1.0 to output direction
+    WDTCTL = WDTPW | WDTHOLD;   // Stop watchdog
 
-    PM5CTL0 &= ~LOCKLPM5;                   // Disable the GPIO power-on default high-impedance mode
-                                            // to activate previously configured port settings
+    init_heartbeat();           // Set up Timer_B0 for blinking P1.0
+    init_keypad();              // Init keyboard with P4s as input and P5s as output
+    init_responseLED();         // LED on P6.6 to show when a key gets pressed
+    init_keyscan_timer();       // Timer_B1 => ~50 ms interrupt
+    pwm_init();                 // start pwm signal on P6.0 - P6.2
+    i2c_master_init();          // Initialize I2C module as master
 
-    while(1)
+    PM5CTL0 &= ~LOCKLPM5;       // Turn on I/O
+
+
+    // Enable global interrupts for the heartbeat timer
+    __bis_SR_register(GIE);
+
+    rgb_set(0xC4, 0x3E, 0x1D);  // start state led as red color, for locked state
+    while (1)
     {
-        P1OUT ^= BIT0;                      // Toggle P1.0 using exclusive-OR
-        __delay_cycles(100000);             // Delay for 100000*(1/MCLK)=0.1s
+        // ----------------------------------------------------------------------------
+        // 1) If we are locked but NOT unlocking...
+        //    - Wait for the first numeric key press (num_update)
+        // ----------------------------------------------------------------------------
+        if (locked && !unlocking)
+        {
+            rgb_set(0xC4, 0x3E, 0x1D);  // set state led as red color, for locked state
+
+            // If no numeric key has been pressed yet, do nothing
+            if (!num_update)
+            {
+                // Just idle here
+                __no_operation();
+            }
+            else
+            {
+                // We got a numeric press => start unlocking process
+                unlocking = true;
+                num_update = false;     // We consumed this press
+                rgb_set(0xC4, 0x92, 0x1D);      // set state led to yellowish color, for unlocking
+
+                // Start collecting passcode digits
+                pass_index = 0;
+
+                // The digit that triggered num_update is in 'curr_num'
+                pass_entered[pass_index++] = curr_num;
+
+                // Start 5-second timer
+                pass_timer = 5;
+            }
+        }
+
+        // ----------------------------------------------------------------------------
+        // 2) If we ARE locked and in the middle of unlocking...
+        //    - Gather a total of 4 numeric keys
+        // ----------------------------------------------------------------------------
+        else if (locked && unlocking)
+        {
+            // Check if we've run out of time
+            if (pass_timer == 0)
+            {
+                // Time’s up => reset D:
+                unlocking = false;
+                pass_index = 0;
+
+                rgb_set(0xC4, 0x3E, 0x1D);  // set state led as red color, for locked state
+            }
+            else
+            {
+                // We still have time => collect digits!
+                if (pass_index < 4)
+                {
+                    if (num_update)
+                    {
+                        pass_entered[pass_index++] = curr_num;
+                        num_update = false;
+                    }
+                }
+                else
+                {
+                    rgb_set(0xC4, 0x3E, 0x1D);  // set state LED to red color, for locked
+
+                    // 4 digits => compare
+                    pass_entered[4] = '\0';
+                    num_update = false;
+
+                    if (strcmp(pass_entered, CORRECT_PASS) == 0)
+                    {
+                        // Correct => unlock
+                        locked = false;
+                        curr_num = 0; // Setting this to nothing so it doesn't immedately jump into a pattern
+                        rgb_set(0x1D, 0xA2, 0xC4);  // set state LED to blueish color, for unlocked
+                        i2c_send_to_both('U');      // Send 'U' to both slaves
+                    }
+                    // Otherwise => stay locked, reset
+                    unlocking = false;
+                }
+            }
+        }
+
+        // ----------------------------------------------------------------------------
+        // 3) If we are NOT locked => begin updating led_bar
+        // ----------------------------------------------------------------------------
+        else
+        {
+            // locked == false
+            // Update RGB LED based on curr_num when unlocked
+            set_rgb_for_pattern(curr_num);
+        }
     }
 }

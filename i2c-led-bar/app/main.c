@@ -1,84 +1,79 @@
-/* --COPYRIGHT--,BSD_EX
- * Copyright (c) 2014, Texas Instruments Incorporated
- * All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- *
- * *  Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- *
- * *  Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- *
- * *  Neither the name of Texas Instruments Incorporated nor the names of
- *    its contributors may be used to endorse or promote products derived
- *    from this software without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
- * THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR
- * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
- * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
- * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
- * OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
- * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
- * OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
- * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- *******************************************************************************
- *
- *                       MSP430 CODE EXAMPLE DISCLAIMER
- *
- * MSP430 code examples are self-contained low-level programs that typically
- * demonstrate a single peripheral function or device feature in a highly
- * concise manner. For this the code may rely on the device's power-on default
- * register values and settings such as the clock configuration and care must
- * be taken when combining code from several examples to avoid potential side
- * effects. Also see www.ti.com/grace for a GUI- and www.ti.com/msp430ware
- * for an API functional library-approach to peripheral configuration.
- *
- * --/COPYRIGHT--*/
-//******************************************************************************
-//  MSP430FR231x Demo - Toggle P1.0 using software
-//
-//  Description: Toggle P1.0 every 0.1s using software.
-//  By default, FR231x select XT1 as FLL reference.
-//  If XT1 is present, the PxSEL(XIN & XOUT) needs to configure.
-//  If XT1 is absent, switch to select REFO as FLL reference automatically.
-//  XT1 is considered to be absent in this example.
-//  ACLK = default REFO ~32768Hz, MCLK = SMCLK = default DCODIV ~1MHz.
-//
-//           MSP430FR231x
-//         ---------------
-//     /|\|               |
-//      | |               |
-//      --|RST            |
-//        |           P1.0|-->LED
-//
-//   Darren Lu
-//   Texas Instruments Inc.
-//   July 2015
-//   Built with IAR Embedded Workbench v6.30 & Code Composer Studio v6.1 
-//******************************************************************************
-#include <msp430.h>
+#include <msp430fr2310.h>
+#include <stdbool.h>
+#include "../../common/i2c.h"
+#include "../src/led_bar.h"
+
+// Globals for LED bar control
+int base_transition_period = 16;  // Initial transition period
+int BTP_multiplier = 4;           // Multiplier for delay timing
+char curr_num = '0';              // Current pattern number
+char prev_num = '0';              // Previous pattern number for reset logic
+bool locked = true;               // System lock state
+bool num_update = false;          // Flag for new pattern received
+bool reset_pattern = false;       // Flag to reset pattern
+char received = 'a';              // Char to hold incoming data from i2c
+
+#define SLAVE_ADDRESS SLAVE1_ADDR  // Use SLAVE1_ADDR from i2c.h
 
 int main(void)
 {
-    WDTCTL = WDTPW | WDTHOLD;               // Stop watchdog timer
+    // Stop watchdog timer
+    WDTCTL = WDTPW | WDTHOLD;
 
-    P1OUT &= ~BIT0;                         // Clear P1.0 output latch for a defined power-on state
-    P1DIR |= BIT0;                          // Set P1.0 to output direction
+    // Set P1.0 as output for debug
+    P1DIR |= BIT1;
+    P1OUT &= ~BIT1;  // Start low
 
-    PM5CTL0 &= ~LOCKLPM5;                   // Disable the GPIO power-on default high-impedance mode
-                                            // to activate previously configured port settings
-
-    while(1)
+    while (true)
     {
-        P1OUT ^= BIT0;                      // Toggle P1.0 using exclusive-OR
-        __delay_cycles(100000);             // Delay for 100000*(1/MCLK)=0.1s
+        // Initialize LED bar
+        led_bar_init();
+
+        // Disable low-power mode / GPIO high-impedance
+        PM5CTL0 &= ~LOCKLPM5;
+
+        // Initialize I2C as slave
+        i2c_slave_init(SLAVE_ADDRESS);
+        __enable_interrupt();
+
+        while (true)
+        {
+            if (i2c_get_received_data(&received))  // Poll the i2c for new data
+            {
+                // Process received data to update LED bar state
+                if (received == 'D')
+                {
+                    locked = true;          // Lock the system
+                    led_bar_update(0x00);   // Clear LED bar when locked
+                }
+                else if (received == 'U')
+                {
+                    locked = false;         // Unlock the system
+                }
+                else if (received >= '0' && received <= '4')
+                {
+                    prev_num = curr_num;    // Store previous pattern
+                    curr_num = received;    // Set new pattern
+                    num_update = true;      // Flag new pattern received
+                    reset_pattern = (prev_num == curr_num);  // Reset if same pattern
+                }
+                else if (received == 'A' && !locked)
+                {
+                    base_transition_period -= 4;  // Decrease delay
+                    if (base_transition_period < 4) base_transition_period = 4;
+                }
+                else if (received == 'B' && !locked)
+                {
+                    base_transition_period += 4;  // Increase delay
+                }
+            }
+
+            // Update LED bar if not locked
+            if (!locked)
+            {
+                led_bar_update_pattern();
+                led_bar_delay();
+            }
+        }
     }
 }
