@@ -7,7 +7,7 @@
 
 /* --- global variables --- */
 
-#define SLAVE_ADDRESS SLAVE1_ADDR  // Use SLAVE2_ADDR from i2c.h --TESTING SOMETHING HERE S1
+#define SLAVE_ADDRESS SLAVE1_ADDR
 
 char curr_key = 'a';
 
@@ -16,11 +16,15 @@ char curr_key = 'a';
 
 // this contains the logic to update the transition_period
 // 	string according to the base_transition_period
-void _update_transition_period(char *transition_period, uint8_t base_transition_period){
+void _update_transition_period(char *transition_period, uint8_t base_transition_period)
+{
 
 	// soft cap of base_transition_period at 9.75, since it
 	// 	seems unreasonable to display anything more than that
-	if(base_transition_period > 39) base_transition_period = 39;
+	if (base_transition_period > 39)
+	{
+		base_transition_period = 39;
+	}
 
 	// first turn the integer part into a string
 	transition_period[7] = '0' + (base_transition_period >> 2);
@@ -28,8 +32,8 @@ void _update_transition_period(char *transition_period, uint8_t base_transition_
 	// because the base_transition_period moves in increments of
 	//  0.25 it is possible to switch on the lower 4 bits of it
 	//  and insert the correct string with no further calculation
-	switch(base_transition_period & 0x03){
-
+	switch (base_transition_period & 0x03)
+	{
 		case 0x00:
 			transition_period[9] = '0';
 			transition_period[10] = '0';
@@ -55,7 +59,7 @@ void _update_transition_period(char *transition_period, uint8_t base_transition_
 int main(void)
 {
     // Stop watchdog timer
-    WDTCTL = WDTPW | WDTHOLD;
+	WDTCTL = WDTPW | WDTHOLD;
 
 	const char *pattern_0 = "static          ";
 	const char *pattern_1 = "toggle          ";
@@ -74,18 +78,17 @@ int main(void)
 	// this interpretation makes string conversion much faster
 	uint8_t base_transition_period = 4;	
 
-	// the state of the system, whether is is locked or unlocked
 	uint8_t locked = 1;
 
     // Disable low-power mode / GPIO high-impedance
-    PM5CTL0 &= ~LOCKLPM5;
+	PM5CTL0 &= ~LOCKLPM5;
 
 	// This double while(1) loop looks redudant but is quite important. Without this
 	// 	extra while(1) loop, when powering up a programmed MSP the lcd_init will
 	// 	always fail. I do not know why this solves it, but it does.
-	// This implies that the extra while(1) loop is unecessary when debugging with
-	// 	CCS, but it can be handy for resetting the lcd mid-debug.
-	while(1){
+	// Unfortunately, this extra while(1) loop can cause issues when debugging with CCS.
+	while (1)
+	{
 		lcd_init();
 
 		// Initialize I2C as slave
@@ -94,18 +97,24 @@ int main(void)
 
 		while (1)
 		{
-			if (i2c_get_received_data(&curr_key))  // Poll to see if we have a new key - store in curr_key if so
+			// Poll to see if we have a new key - store in curr_key if so
+			if (i2c_get_received_data(&curr_key))
         	{
-				switch(curr_key){
+				switch (curr_key)
+				{
 					case 'D':
 						locked = 1;
 						lcd_clear_display();
-						lcd_set_ddram_addr(0x20);	// this is so the cursor does not show up
+
+						// this is so the cursor does not show up on a
+						//	cleared scrren, that would defeat the purpose
+						lcd_set_ddram_addr(0x20);
 
 						break;
 
 					case 'U':
 						locked = 0;
+						lcd_print_line(transition_period, 1);
 
 						break;
 
@@ -181,8 +190,12 @@ int main(void)
 
 				lcd_update_current_key();
 			}
-			else{
-				if(locked) lcd_clear_display();
+			else
+			{
+				if (locked)
+				{
+					lcd_clear_display();
+				}
 			}
 		}
 	}
