@@ -23,6 +23,17 @@ unsigned char count_2 = 255;
 unsigned char count_3 = COUNT_3_ARRAY_MAX_INDEX;
 unsigned char count_4 = 0;
 
+void led_bar_update(unsigned char update_value){
+    // update LED bar with pin mapping for P1.0, P1.4, P1.5, P1.6, P1.7, P1.1, P2.6, P2.7
+    P1OUT = (P1OUT & ~(BIT0 | BIT1 | BIT4 | BIT5 | BIT6 | BIT7)) | \
+            (((update_value) & BIT0) << 0) | \
+            (((update_value) & (BIT1 | BIT2 | BIT3 | BIT4)) << 3) | \
+            (((update_value) & BIT5) >> 4); \
+    P2OUT = (P2OUT & ~(BIT6 | BIT7)) | \
+            (((update_value) & (BIT6 | BIT7)) << 0);
+}
+
+
 void led_bar_init(void)
 {
     // Configure LED bar pins as outputs: P1.0, P1.4, P1.5, P1.6, P1.7, P1.1, P2.6, P2.7
